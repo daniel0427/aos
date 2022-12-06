@@ -1,0 +1,70 @@
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <unistd.h>
+#include <sys/socket.h>
+#include <sys/types.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
+
+#define PORT 4444
+
+
+static char* students[] = {"ken" , "alice" , "bob", "andy" , "daniel", "ethen"};/*NAME GROUP*/
+
+char name[6];
+
+int main(){
+
+	const char* cr = "create";
+    const char* wr = "write";
+    const char* rd = "read";
+    const char* ch = "changemode";
+
+	int nameret ;
+	char buffer[1024];
+	
+	int clientSocket, ret;
+	struct sockaddr_in clientAddr;
+
+	clientSocket = socket(AF_INET, SOCK_STREAM, 0);
+	if(clientSocket < 0){
+		printf("[-]Error in connection.\n");
+		exit(1);
+	}
+	printf("[+]Client Socket is created.\n");
+
+	memset(&clientAddr, '\0', sizeof(clientAddr));
+	clientAddr.sin_family = AF_INET;
+	clientAddr.sin_port = htons(PORT);
+	clientAddr.sin_addr.s_addr = inet_addr("127.0.0.1");
+
+	ret = connect(clientSocket, (struct sockaddr*)&clientAddr, sizeof(clientAddr));
+	if(ret < 0){
+		printf("[-]Error in connection.\n");
+		exit(1);
+	}
+	printf("[+]Connected to Server.\n");
+
+	
+    
+    const char* d = " ";
+    bzero(name , sizeof(name));
+    printf("please enter username:\n");
+    scanf("%s",name);
+	send(clientSocket, buffer, 1024, 0);
+
+    for(int i =0 ; i <6 ;i++){
+        nameret = strcmp(name , students[i]);
+        if(nameret == 0)
+            break;
+    }
+    if(nameret != 0){
+        printf("you are not be admitted\n");
+        exit(1);
+     }
+
+	printf("enter mode filename permission:\n");
+
+	return 0;
+}
