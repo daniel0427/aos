@@ -1,0 +1,94 @@
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <unistd.h>
+#include <sys/socket.h>
+#include <sys/types.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
+
+#define PORT 4444
+
+
+static char* student[] = {"ken" , "alice" , "bob", "andy" , "daniel", "ethen"};/*NAME GROUP*/
+static char* AOE[] = {"ken" , "alice" , "bob"};
+static char* CSE[] = {"andy" , "daniel", "ethen"};
+
+int main(){
+
+	int server_socket, ret;
+	struct sockaddr_in serverAddr;
+
+	int newSocket;
+	struct sockaddr_in newAddr;
+
+	socklen_t addr_size;
+
+	char buffer[1024];
+	pid_t childpid;
+
+	server_socket = socket(AF_INET, SOCK_STREAM, 0);
+	if(server_socket < 0){
+		printf("[-]Error in connection.\n");
+		exit(1);
+	}
+	printf("[+]Server Socket is created.\n");
+
+	memset(&serverAddr, '\0', sizeof(serverAddr));
+	serverAddr.sin_family = AF_INET;
+	serverAddr.sin_port = htons(PORT);
+	serverAddr.sin_addr.s_addr = inet_addr("127.0.0.1");
+
+	ret = bind(server_socket, (struct sockaddr*)&serverAddr, sizeof(serverAddr));
+	if(ret < 0){
+		printf("[-]Error in binding.\n");
+		exit(1);
+	}
+	printf("[+]Bind to port %d\n", 4444);
+
+    while(1){
+	    if(listen(server_socket, 10) == 0){
+		    printf("[+]Listening....\n");
+        
+            while(1){
+            newSocket = accept(server_socket, (struct sockaddr*)&newAddr, &addr_size);
+            if(newSocket < 0){
+                printf("Accept Faiked.\n");
+                exit(1);
+            }
+                printf("Connection accepted from %s:%d\n", inet_ntoa(newAddr.sin_addr), ntohs(newAddr.sin_port));
+            }
+	    }else{
+		    printf("[-]Error in Listening.\n");
+	    }
+    
+    }
+    while(1){
+        recv(newSocket, buffer, 1024, 0);
+    }
+
+
+
+		/*if((childpid = fork()) == 0){
+			close(server_socket);
+
+			while(1){
+				recv(newSocket, buffer, 1024, 0);
+				if(strcmp(buffer, ":exit") == 0){
+					printf("Disconnected from %s:%d\n", inet_ntoa(newAddr.sin_addr), ntohs(newAddr.sin_port));
+					break;
+				}else{
+					printf("Client: %s\n", buffer);
+					send(newSocket, buffer, strlen(buffer), 0);
+					bzero(buffer, sizeof(buffer));
+				}
+			}
+		}*/
+
+	
+
+	close(newSocket);
+
+
+	return 0;
+}
