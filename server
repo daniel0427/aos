@@ -1,20 +1,286 @@
+#include <netinet/in.h>
+#include <sys/types.h>
+#include <sys/socket.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <fcntl.h>
+#include <pthread.h>
 #include <unistd.h>
-#include <sys/socket.h>
-#include <sys/types.h>
-#include <netinet/in.h>
-#include <arpa/inet.h>
+
 
 #define PORT 4444
+#define FILE_NAME 512
+#define BUF_SIZE 1024
+#define QUEUELEN 20
+#define ADDMAX 10
 
 
 static char* student[] = {"ken" , "alice" , "bob", "andy" , "daniel", "ethen"};/*NAME GROUP*/
-static char* AOE[] = {"ken" , "alice" , "bob"};
+static char* AOS[] = {"ken" , "alice" , "bob"};
 static char* CSE[] = {"andy" , "daniel", "ethen"};
 
-int main(){
+typedef struct control
+{
+    char *filename;
+    char *owner;
+    int AOSread;
+    int AOSwrite;
+    int CSEread;
+    int CSEwrite;
+    int state;
+    struct control *next;
+}control;
+control *head = NULL;
+ 
+void *create_thread(new_server_socket);/*
+void *write_thread(new_server_socket);
+void *read_thread(new_server_socket);
+void *changemode_thread(new_server_socket);*/
+
+
+
+int main(int argc , char** argv)
+{
+    const char* cr = "create";/*
+    const char* wr = "write";
+    const char* rd = "read";
+    const char* ch = "changemode";*/
+    
+    struct sockaddr_in server_addr;
+    bzero(&server_addr , sizeof(server_addr));
+    server_addr.sin_family = AF_INET;
+    server_addr.sin_addr.s_addr = htons(INADDR_ANY);
+    server_addr.sin_port = htons(PORT);
+    
+    int server_socket = socket(AF_INET , SOCK_STREAM , 0);
+    if(server_socket <0)
+    {
+        printf("create Failed\n");
+        exit(1);
+    }
+    if(bind(server_socket , (struct sockaddr*)&server_addr , sizeof(server_addr)))
+    {
+        printf("bind Failed\n");
+        exit(1);
+    }
+    if(listen(server_socket,QUEUELEN))
+    {
+        printf("server listen failed\n");
+        exit(1);
+    }
+
+    while(1)
+    {
+        struct sockaddr_in client_addr;
+        socklen_t length = sizeof(client_addr);
+        int new_server_socket = accept(server_socket , (struct sockaddr*)&client_addr, &length);
+        if(new_server_socket <0)
+        {
+            printf("Accept Failed\n");
+            exit(1);
+        }
+        pthread_t t;
+        
+        char mode[BUF_SIZE];
+        bzero(mode , sizeof(mode));
+
+        length = recv(new_server_socket , mode , BUF_SIZE , 0);
+        printf("actionmode : %s\n",mode);
+        if(length < 0)
+        {
+            printf("Receive mode Failed\n");
+            break;
+        }
+        
+        int cret = strcmp(mode , cr );/*
+        int wret = strcmp(mode , wr );
+        int rret = strcmp(mode , rd );
+        int mret = strcmp(mode , ch );*/
+        int pthread_id;
+        if(cret ==0 )
+        {
+             int thread = pthread_create(&t , NULL , create_thread , new_server_socket);
+             if(thread == -1)
+             {
+                 printf("cthread create Failed");
+                 break;
+             }
+        }/*
+        if (wret ==0 )
+        {
+            int thread = pthread_create(&t , NULL , write_thread , new_server_socket);
+            if(thread == -1)
+            {
+                printf("wthread create Failed");
+                break;
+            }
+        }
+        if(rret == 0 )
+        { 
+            int thread = pthread_create(&t , NULL , read_thread , new_server_socket);
+            if(thread == -1)
+            {
+                printf("rthread create Failed");
+                break;
+            }
+        }
+        if(mret == 0 )
+        {
+            int thread = pthread_create(&t , NULL , changemode_thread , new_server_socket);
+            if(thread == -1)
+            {
+                printf("cmthread create Failed");
+                break;
+            }
+        }*/
+    }
+}
+        
+        
+void *create_thread(new_server_socket)
+{
+    char name[6];
+    char filename[FILE_NAME];
+    char addition[ADDMAX];
+    int fd , length , write_length , aret , cret , pret , fileret , exist;
+    char bufdata[BUF_SIZE];
+    char permission1[5] = "allow";
+    char permission2[4] = "deny";
+
+    bzero(bufdata , sizeof(bufdata));
+    length = recv(new_server_socket , bufdata , BUF_SIZE , 0);//name
+    if(length < 0)
+    {
+        printf("Receive name Failed\n");
+        pthread_exit(1);
+    }
+    strncpy(name , bufdata , 6);
+    bzero(bufdata , sizeof(bufdata));
+    printf("user : %s\n",name);
+    
+    length = recv(new_server_socket , bufdata , BUF_SIZE , 0 ); //FILENAME
+    if(length < 0)
+    {
+        printf("Receive filename Failed\n");
+        pthread_exit(1);
+    }
+    strncpy(filename , bufdata , FILE_NAME);
+    bzero(bufdata , sizeof(bufdata));
+    printf("filename : %s\n",filename);
+    
+    length = recv(new_server_socket , bufdata , BUF_SIZE ,0 );  //ADDITION
+    if(length < 0 )
+    {
+        printf("Receive addition Failed\n");
+        pthread_exit(1);
+    }
+    strncpy(addition , bufdata , ADDMAX);
+    bzero(bufdata , sizeof(bufdata));
+
+    for(int a = 0 ; a < 3 ; a++){
+        cret = strcmp(name , CSE[a]);
+        if(cret == 0)
+            break;
+        aret = strcmp(name , AOS[a]);
+        if(aret == 0)
+            break;
+    }
+    
+    control *current = head;
+    while(current != NULL){
+        if(fileret = strcmp(current -> filename , filename) == 0){
+                printf("File is already exist\n");
+                exist = 1;
+                send(new_server_socket , permission2 , BUF_SIZE , 0);
+                break;
+        }
+        current = current -> next;
+    }
+    
+    if(exist != 1){
+        fd = open(filename , O_CREAT | O_EXCL , 0777);
+        if(fd == -1)
+        {
+            printf("file creating failed\n");
+            send(new_server_socket , permission2 , BUF_SIZE , 0);
+            close(new_server_socket);
+            pthread_exit(1);
+        }     
+        send(new_server_socket , permission1 , BUF_SIZE , 0);
+        control *new_control = (control*) malloc(sizeof(control));
+    
+        new_control -> filename = (char *)malloc(sizeof(char) * (strlen(filename) + 1));
+        strcpy(new_control -> filename, filename);
+    
+        new_control -> owner = (char *)malloc(sizeof(char) * (strlen(name) + 1));
+        strcpy(new_control -> owner, name);
+
+        new_control -> next =NULL;    
+
+        if(aret == 0){
+            if(addition[2] == 'r')
+                new_control -> AOSread = 1;
+            else
+                new_control -> AOSread = 0;
+            if(addition[3] == 'w')
+                new_control -> AOSwrite = 1;
+            else
+                new_control -> AOSwrite = 0;
+            if(addition[4] == 'r')
+                new_control -> CSEread = 1;
+            else
+                new_control -> CSEread = 0;
+            if(addition[5] == 'w')
+                new_control -> CSEwrite = 1;
+            else
+                new_control -> CSEwrite = 0;
+        }
+        if(cret == 0){
+            if(addition[2] == 'r')
+                new_control -> CSEread = 1;
+            else
+                new_control -> CSEread = 0;
+            if(addition[3] == 'w')
+                new_control -> CSEwrite = 1;
+            else
+                new_control -> CSEwrite = 0;
+            if(addition[4] == 'r')
+                new_control -> AOSread = 1;
+            else
+                new_control -> AOSread = 0;
+            if(addition[5] == 'w')
+                new_control -> AOSwrite = 1;
+            else
+                new_control -> AOSwrite = 0;
+        }
+        if(head == NULL)
+        {
+            head = new_control;
+        }         
+        else
+        {  
+            control *current;
+            current = head;
+            while(1){
+                if(current -> next == NULL){
+                    current -> next = new_control;
+                    break;
+                }
+                current = current -> next;
+            }
+        }
+        printf("file sucessfully create\n");
+        send(new_server_socket , permission1 , sizeof(permission1),0);
+        pthread_exit(0);
+    }
+    if(exist == 1)
+    {
+        close(new_server_socket);
+        pthread_exit(1);
+    }
+}
+/*int main(){
 
 	int server_socket, ret;
 	struct sockaddr_in serverAddr;
@@ -63,11 +329,6 @@ int main(){
 	    }
     
     }
-    while(1){
-        recv(newSocket, buffer, 1024, 0);
-    }
-
-
 
 		/*if((childpid = fork()) == 0){
 			close(server_socket);
@@ -83,12 +344,10 @@ int main(){
 					bzero(buffer, sizeof(buffer));
 				}
 			}
-		}*/
+		}
 
 	
 
-	close(newSocket);
+	close(newSocket);*/
 
 
-	return 0;
-}
